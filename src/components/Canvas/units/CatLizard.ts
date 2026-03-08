@@ -2,8 +2,14 @@ import { type UnitStats } from '../../../types/game';
 
 /**
  * ネコトカゲを描画する関数
+ * 攻撃時に口から勢いよく火を噴く演出を追加
  */
 export const drawCatLizard = (ctx: CanvasRenderingContext2D, stats: UnitStats, timestamp: number) => {
+  // 攻撃アニメーションの計算 (約2秒周期)
+  const attackCycle = (timestamp % 2000) / 2000;
+  const isFiring = attackCycle > 0.6 && attackCycle < 0.9;
+  const firePower = isFiring ? Math.sin((attackCycle - 0.6) * Math.PI / 0.3) : 0;
+
   // 足元の影
   ctx.fillStyle = 'rgba(0,0,0,0.1)';
   ctx.beginPath(); ctx.ellipse(0, 15, stats.radius * 2, 6, 0, 0, Math.PI * 2); ctx.fill();
@@ -37,7 +43,9 @@ export const drawCatLizard = (ctx: CanvasRenderingContext2D, stats: UnitStats, t
     ctx.stroke();
   }
 
-  // 4. 頭部
+  // 4. 頭部 (攻撃時に前に突き出す)
+  ctx.save();
+  ctx.translate(firePower * 10, 0);
   ctx.fillStyle = stats.color;
   ctx.beginPath();
   ctx.arc(stats.radius * 1.6, -8, stats.radius * 0.75, 0, Math.PI * 2);
@@ -51,11 +59,37 @@ export const drawCatLizard = (ctx: CanvasRenderingContext2D, stats: UnitStats, t
   ctx.fill();
   ctx.stroke();
 
-  // 6. 目 (光あり)
+  // 6. 目
   ctx.fillStyle = '#333';
   ctx.beginPath(); ctx.arc(stats.radius * 1.9, -10, 2.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(stats.radius * 1.95, -11, 1, 0, Math.PI * 2); ctx.fill();
+
+  // 7. 火を噴くエフェクト
+  if (isFiring) {
+    const headX = stats.radius * 2.2;
+    const headY = -8;
+    
+    // メインの炎
+    const fireGrad = ctx.createRadialGradient(headX, headY, 5, headX + firePower * 60, headY, firePower * 40);
+    fireGrad.addColorStop(0, '#f1c40f'); // 黄
+    fireGrad.addColorStop(0.5, '#e67e22'); // 橙
+    fireGrad.addColorStop(1, 'rgba(231, 76, 60, 0)'); // 赤 (透明に消える)
+    
+    ctx.fillStyle = fireGrad;
+    ctx.beginPath();
+    ctx.moveTo(headX, headY);
+    ctx.quadraticCurveTo(headX + firePower * 40, headY - 30, headX + firePower * 80, headY);
+    ctx.quadraticCurveTo(headX + firePower * 40, headY + 30, headX, headY);
+    ctx.fill();
+
+    // 火の粉
+    for (let j = 0; j < 5; j++) {
+      ctx.fillStyle = '#e74c3c';
+      const fx = headX + Math.random() * firePower * 80;
+      const fy = headY + (Math.random() - 0.5) * 20;
+      ctx.beginPath(); ctx.arc(fx, fy, 2, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
 
   ctx.restore();
 };

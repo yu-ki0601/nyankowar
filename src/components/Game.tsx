@@ -110,8 +110,17 @@ const Game: React.FC = () => {
       });
       s.enemySpawnTimer += dt * 1000;
       if (s.enemySpawnTimer > stage.enemySpawnRate) { 
-        const stats = { ...UNIT_TYPES['ENEMY'] }; stats.hp *= stage.enemyHpMultiplier;
-        s.units.push({ id: s.nextUnitId++, x: CANVAS_WIDTH - 110, y: CANVAS_HEIGHT - 70, type: 'enemy', unitType: 'ENEMY', stats, currentHp: stats.hp });
+        // 出現確率の抽選
+        const rand = Math.random();
+        let enemyType: string;
+        if (rand < 0.05) enemyType = 'BEAR'; // 5% くま
+        else if (rand < 0.20) enemyType = 'HIPPO'; // 15% カバ
+        else if (rand < 0.50) enemyType = 'SNAKE'; // 30% へび
+        else enemyType = 'ENEMY'; // 50% わんこ
+
+        const stats = { ...UNIT_TYPES[enemyType] };
+        stats.hp *= stage.enemyHpMultiplier;
+        s.units.push({ id: s.nextUnitId++, x: CANVAS_WIDTH - 110, y: CANVAS_HEIGHT - 70, type: 'enemy', unitType: enemyType, stats, currentHp: stats.hp });
         s.enemySpawnTimer = 0; 
       }
       let someoneIsAttacking = false;
