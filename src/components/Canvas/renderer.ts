@@ -1,28 +1,27 @@
-import { type UnitStats, CANVAS_WIDTH, CANVAS_HEIGHT, type StageConfig } from '../../constants/gameStats';
+import { type Unit, CANVAS_WIDTH, CANVAS_HEIGHT, type StageConfig } from '../../types/game';
 import { drawCat } from './units/drawCat';
 import { drawDog } from './units/drawDog';
 import { drawBackground } from './stage/drawBackground';
 import { drawCastle } from './stage/drawCastle';
 
-interface Unit {
-  id: number; x: number; y: number; type: 'ally' | 'enemy';
-  unitType: string; stats: UnitStats; currentHp: number;
-}
-
+/**
+ * ゲーム全体のメイン描画関数
+ */
 export const drawGame = (ctx: CanvasRenderingContext2D, s: any, stage: StageConfig, timestamp: number) => {
+  // 1. 画面のクリア
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   
-  // 1. ステージ背景
+  // 2. ステージ背景の描画
   drawBackground(ctx, stage, timestamp);
 
-  // 2. 城
-  drawCastle(ctx, 40, '#d5dbdb', '#3498db');
-  drawCastle(ctx, CANVAS_WIDTH - 120, '#566573', '#e74c3c');
+  // 3. 城 (拠点) の描画
+  drawCastle(ctx, 40, '#d5dbdb', '#3498db'); // 自城
+  drawCastle(ctx, CANVAS_WIDTH - 120, '#566573', '#e74c3c'); // 敵城
 
-  // 3. HPゲージ
+  // 4. 城のHPゲージ
   drawHpBars(ctx, s.baseHp, s.enemyBaseHp, stage);
 
-  // 4. ユニット
+  // 5. 全ユニットの描画
   s.units.forEach((u: Unit) => {
     if (u.type === 'ally') {
       drawCat(ctx, u.x, u.y, u.stats, u.unitType, u.currentHp, timestamp);
@@ -31,9 +30,10 @@ export const drawGame = (ctx: CanvasRenderingContext2D, s: any, stage: StageConf
     }
   });
 
-  // 5. UI
+  // 6. UIオーバーレイ (お金、レベル表示)
   drawUiOverlay(ctx, s.money, s.walletLevel);
 
+  // 7. 特殊演出 (にゃんこ砲)
   if (s.isCannonFiring) {
     drawCannonEffect(ctx);
   }
@@ -42,10 +42,10 @@ export const drawGame = (ctx: CanvasRenderingContext2D, s: any, stage: StageConf
 const drawHpBars = (ctx: CanvasRenderingContext2D, baseHp: number, enemyBaseHp: number, stage: StageConfig) => {
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
   ctx.fillRect(30, CANVAS_HEIGHT - 175, 100, 8); ctx.strokeRect(30, CANVAS_HEIGHT - 175, 100, 8);
-  ctx.fillStyle = '#3498db'; ctx.fillRect(30, CANVAS_HEIGHT - 175, (baseHp / stage.baseHp) * 100, 8);
+  ctx.fillStyle = '#3498db'; ctx.fillRect(30, CANVAS_HEIGHT - 175, Math.max(0, (baseHp / stage.baseHp) * 100), 8);
   ctx.fillStyle = '#fff';
   ctx.fillRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, 100, 8); ctx.strokeRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, 100, 8);
-  ctx.fillStyle = '#e74c3c'; ctx.fillRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, (enemyBaseHp / stage.enemyBaseHp) * 100, 8);
+  ctx.fillStyle = '#e74c3c'; ctx.fillRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, Math.max(0, (enemyBaseHp / stage.enemyBaseHp) * 100), 8);
 };
 
 const drawUiOverlay = (ctx: CanvasRenderingContext2D, money: number, walletLevel: number) => {

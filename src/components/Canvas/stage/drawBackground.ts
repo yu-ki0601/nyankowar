@@ -1,4 +1,4 @@
-import { CANVAS_WIDTH, CANVAS_HEIGHT, type StageConfig } from '../../../constants/gameStats';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, type StageConfig } from '../../../types/game';
 
 /**
  * ステージに応じた背景を描画する関数
@@ -23,7 +23,11 @@ export const drawBackground = (ctx: CanvasRenderingContext2D, stage: StageConfig
   const cloudX = (timestamp / 100) % (CANVAS_WIDTH + 200) - 100;
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   const drawSingleCloud = (cx: number, cy: number) => {
-    ctx.beginPath(); ctx.arc(cx, cy, 20, 0, Math.PI * 2); ctx.arc(cx + 25, cy - 5, 25, 0, Math.PI * 2); ctx.arc(cx + 50, cy, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+    ctx.arc(cx + 25, cy - 5, 25, 0, Math.PI * 2);
+    ctx.arc(cx + 50, cy, 20, 0, Math.PI * 2);
+    ctx.fill();
   };
   drawSingleCloud(cloudX, 50);
   drawSingleCloud(cloudX - 400, 80);

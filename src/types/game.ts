@@ -1,4 +1,10 @@
 /**
+ * ゲームの基本定数
+ */
+export const CANVAS_WIDTH = 800;
+export const CANVAS_HEIGHT = 400;
+
+/**
  * ユニットの基本性能を定義
  */
 export interface UnitStats {
@@ -11,6 +17,19 @@ export interface UnitStats {
   cooldown: number;
   radius: number;
   range: number;
+}
+
+/**
+ * 画面上のユニットインスタンスの定義
+ */
+export interface Unit {
+  id: number;
+  x: number;
+  y: number;
+  type: 'ally' | 'enemy';
+  unitType: string;
+  stats: UnitStats;
+  currentHp: number;
 }
 
 /**

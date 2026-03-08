@@ -1,4 +1,4 @@
-import { CANVAS_HEIGHT } from '../../../constants/gameStats';
+import { CANVAS_HEIGHT } from '../../../types/game';
 
 /**
  * お城（拠点）を描画する関数
