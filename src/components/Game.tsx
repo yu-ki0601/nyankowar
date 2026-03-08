@@ -161,7 +161,7 @@ const Game: React.FC = () => {
   return (
     <div style={{ textAlign: 'center', backgroundColor: '#ecf0f1', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '10px' }}>
-        <h1>にゃんこ大戦争プロトタイプ</h1>
+        <h1>ねこねこ大戦争プロトタイプ</h1>
         <button onClick={() => audio.setIsAudioEnabled(!audio.isAudioEnabled)} style={{ padding: '8px 15px', borderRadius: '20px', border: 'none', background: audio.isAudioEnabled ? '#e74c3c' : '#2ecc71', color: '#fff', cursor: 'pointer' }}>
           SOUND: {audio.isAudioEnabled ? 'OFF' : 'ON'}
         </button>
