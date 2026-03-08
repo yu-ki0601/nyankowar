@@ -21,39 +21,52 @@ const Game: React.FC = () => {
     nextUnitId: 0, enemySpawnTimer: 0,
     cooldowns: { BASIC: 0, TANK: 0, BATTLE: 0, LEGS: 0, COW: 0, BIRD: 0, FISH: 0, LIZARD: 0 } as Record<string, number>,
     lastTime: 0, lastAttackSoundTime: 0,
-    gameState: 'start' as 'start' | 'playing' | 'victory' | 'defeat'
+    gameState: 'title' as 'title' | 'start' | 'playing' | 'victory' | 'defeat'
   });
 
   const [ui, setUi] = useState({
     money: 0, walletLevel: 1, baseHp: 1000, enemyBaseHp: 1000,
-    cannonCharge: 0, gameState: 'start' as any,
+    cannonCharge: 0, gameState: 'title' as any,
     cooldownPercents: { BASIC: 100, TANK: 100, BATTLE: 100, LEGS: 100, COW: 100, BIRD: 100, FISH: 100, LIZARD: 100 }
   });
 
-  /**
-   * BGM管理用のEffect
-   * 状態（開始/終了）やステージIDが変わるたびに、自動的に適切なBGMを制御します。
-   */
+  // BGM管理
   useEffect(() => {
     if (ui.gameState === 'playing') {
       audio.startBGM(currentStage.id);
     } else {
       audio.stopBGM();
     }
-  }, [ui.gameState, currentStage.id]); // 状態とステージIDを監視
+  }, [ui.gameState, currentStage.id]);
+
+  const toStageSelect = () => {
+    audio.initAudio();
+    stateRef.current.gameState = 'start';
+    setUi(prev => ({ ...prev, gameState: 'start' }));
+    audio.playSystemSE(660);
+  };
+
+  const backToTitle = () => {
+    stateRef.current.gameState = 'title';
+    setUi(prev => ({ ...prev, gameState: 'title' }));
+  };
 
   const startGame = (stage: StageConfig) => {
     setCurrentStage(stage);
     currentStageRef.current = stage;
     audio.initAudio();
-    
     const s = stateRef.current;
     s.baseHp = stage.baseHp; s.enemyBaseHp = stage.enemyBaseHp;
     s.money = 0; s.walletLevel = 1; s.units = []; s.cannonCharge = 0;
     s.gameState = 'playing'; s.lastTime = 0;
     s.cooldowns = { BASIC: 0, TANK: 0, BATTLE: 0, LEGS: 0, COW: 0, BIRD: 0, FISH: 0, LIZARD: 0 };
-    
     audio.playSystemSE(440);
+  };
+
+  const backToMenu = () => {
+    stateRef.current.gameState = 'start';
+    setUi(prev => ({ ...prev, gameState: 'start' }));
+    audio.stopBGM();
   };
 
   useEffect(() => {
@@ -110,11 +123,11 @@ const Game: React.FC = () => {
         });
         if (u.type === 'ally' && u.x > CANVAS_WIDTH - 150) {
           s.enemyBaseHp = Math.max(0, s.enemyBaseHp - u.stats.damage * dt);
-          if (s.enemyBaseHp <= 0 && s.gameState === 'playing') { s.gameState = 'victory'; a.playVictoryFanfare(); }
+          if (s.enemyBaseHp <= 0 && s.gameState === 'playing') { s.gameState = 'victory'; a.stopBGM(); a.playVictoryFanfare(); }
           isAtk = true;
         } else if (u.type === 'enemy' && u.x < 150) {
           s.baseHp = Math.max(0, s.baseHp - u.stats.damage * dt);
-          if (s.baseHp <= 0 && s.gameState === 'playing') { s.gameState = 'defeat'; a.playDefeatJingle(); }
+          if (s.baseHp <= 0 && s.gameState === 'playing') { s.gameState = 'defeat'; a.stopBGM(); a.playDefeatJingle(); }
           isAtk = true;
         }
         if (isAtk) someoneIsAttacking = true;
@@ -138,18 +151,13 @@ const Game: React.FC = () => {
   };
 
   const handleUpgrade = () => {
-    const s = stateRef.current;
-    const cost = ui.walletLevel * 200;
-    if (s.money >= cost && s.walletLevel < 8) {
-      s.money -= cost; s.walletLevel++; audio.playUpgradeSound();
-    }
+    const s = stateRef.current; const cost = ui.walletLevel * 200;
+    if (s.money >= cost && s.walletLevel < 8) { s.money -= cost; s.walletLevel++; audio.playUpgradeSound(); }
   };
 
   const handleCannon = () => {
-    const s = stateRef.current;
-    if (s.cannonCharge < 100 || s.isCannonFiring) return;
-    s.isCannonFiring = true; s.cannonCharge = 0;
-    audio.playCannonSound();
+    const s = stateRef.current; if (s.cannonCharge < 100 || s.isCannonFiring) return;
+    s.isCannonFiring = true; s.cannonCharge = 0; audio.playCannonSound();
     setTimeout(() => {
       s.units = s.units.map(u => u.type === 'enemy' ? { ...u, currentHp: u.currentHp - 100, x: u.x + 100 } : u).filter(u => u.currentHp > 0);
       setTimeout(() => s.isCannonFiring = false, 500);
@@ -164,8 +172,55 @@ const Game: React.FC = () => {
           SOUND: {audio.isAudioEnabled ? 'OFF' : 'ON'}
         </button>
       </div>
+      
       <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}>
         <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ border: '4px solid #34495e', borderRadius: '15px', backgroundColor: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }} />
+        
+        {/* 1. タイトル画面 */}
+        {ui.gameState === 'title' && (
+          <div 
+            onClick={toStageSelect}
+            style={{ 
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+              background: 'rgba(255,255,255,0)', // 完全透明にして背景を主役に
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', 
+              borderRadius: '12px', cursor: 'pointer', padding: '40px 0'
+            }}
+          >
+            {/* タイトルロゴを上部に配置 */}
+            <div style={{ 
+              background: 'rgba(255,255,255,0.9)', padding: '20px 40px', borderRadius: '20px', 
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)', border: '4px solid #2c3e50',
+              marginTop: '20px'
+            }}>
+              <h2 style={{ fontSize: '50px', color: '#2c3e50', margin: 0, textShadow: '2px 2px 0 #fff, 4px 4px 0 #bdc3c7' }}>ねこねこ大戦争</h2>
+            </div>
+
+            {/* Click to Start を下部に配置 */}
+            <div style={{ 
+              marginBottom: '60px',
+              background: 'linear-gradient(to bottom, #f1c40f, #f39c12)',
+              padding: '5px 15px', // 余白をギュッと小さく
+              borderRadius: '10px', // タイトなサイズに合わせて角丸も調整
+              boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+              border: '3px solid #fff',
+              outline: '2px solid #2c3e50',
+              animation: 'blink 1.2s infinite'
+            }}>
+              <p style={{ 
+                fontSize: '22px', // 少しサイズを調整して密度を上げる
+                color: '#fff', 
+                fontWeight: '900', 
+                margin: 0, 
+                letterSpacing: '2px',
+                textShadow: '1px 1px 3px rgba(0,0,0,0.5)'
+              }}>CLICK TO START</p>
+            </div>
+            <style>{`@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }`}</style>
+          </div>
+        )}
+
+        {/* 2. ステージ選択画面 */}
         {ui.gameState === 'start' && (
           <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: '12px' }}>
             <h2 style={{ fontSize: '32px', marginBottom: '20px' }}>ステージ選択</h2>
@@ -174,15 +229,24 @@ const Game: React.FC = () => {
                 <button key={stage.id} onClick={() => startGame(stage)} style={{ padding: '15px 25px', fontSize: '16px', cursor: 'pointer', borderRadius: '10px', background: stage.id % 2 === 0 ? '#e67e22' : '#2ecc71', color: '#fff', border: 'none', fontWeight: 'bold', boxShadow: '0 4px rgba(0,0,0,0.3)' }}>第{stage.id}章<br/>{stage.name}</button>
               ))}
             </div>
+            <button onClick={backToTitle} style={{ marginTop: '20px', background: 'none', border: '1px solid #fff', color: '#fff', padding: '5px 15px', borderRadius: '5px', cursor: 'pointer' }}>タイトルへ戻る</button>
           </div>
         )}
+
+        {/* プレイ中の「戻る」ボタン */}
+        {ui.gameState === 'playing' && (
+          <button onClick={backToMenu} style={{ position: 'absolute', top: '10px', right: '10px', padding: '5px 15px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}>メニューへ戻る</button>
+        )}
+
+        {/* 3. 勝敗画面 */}
         {(ui.gameState === 'victory' || ui.gameState === 'defeat') && (
           <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: '12px' }}>
             <h2 style={{ fontSize: '60px', color: ui.gameState === 'victory' ? '#f1c40f' : '#e74c3c' }}>{ui.gameState.toUpperCase()}</h2>
-            <button onClick={() => window.location.reload()} style={{ padding: '15px 40px', fontSize: '24px', cursor: 'pointer', borderRadius: '8px', background: '#3498db', color: '#fff', border: 'none', fontWeight: 'bold' }}>BACK TO MENU</button>
+            <button onClick={backToMenu} style={{ padding: '15px 40px', fontSize: '24px', cursor: 'pointer', borderRadius: '8px', background: '#3498db', color: '#fff', border: 'none', fontWeight: 'bold' }}>BACK TO MENU</button>
           </div>
         )}
       </div>
+
       <div style={{ maxWidth: '850px', margin: '0 auto', display: 'flex', justifyContent: 'center', gap: '20px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <GaugeButton label={<>にゃんこ砲<br/>({ui.cannonCharge}%)</>} percent={ui.cannonCharge} onClick={handleCannon} disabled={ui.cannonCharge < 100 || ui.gameState !== 'playing'} readyColor="#e74c3c" gaugeColor="#f39c12" width="120px" />

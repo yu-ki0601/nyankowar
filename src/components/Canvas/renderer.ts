@@ -2,7 +2,7 @@ import { type Unit, CANVAS_WIDTH, CANVAS_HEIGHT, type StageConfig } from '../../
 import { drawBackground } from './stage/drawBackground';
 import { drawCastle } from './stage/drawCastle';
 
-// 各ユニットの描画関数をインポート
+// 各ユニットの描画関数
 import { drawCatBasic } from './units/CatBasic';
 import { drawCatTank } from './units/CatTank';
 import { drawCatBattle } from './units/CatBattle';
@@ -18,16 +18,23 @@ import { drawDogEnemy } from './units/DogEnemy';
  */
 export const drawGame = (ctx: CanvasRenderingContext2D, s: any, stage: StageConfig, timestamp: number) => {
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  
+  // 1. タイトル画面専用の描画
+  if (s.gameState === 'title') {
+    drawTitleBackground(ctx, timestamp);
+    return;
+  }
+
+  // 2. 通常ゲーム画面の描画
   drawBackground(ctx, stage, timestamp);
-  drawCastle(ctx, 40, '#d5dbdb', '#3498db');
-  drawCastle(ctx, CANVAS_WIDTH - 120, '#566573', '#e74c3c');
+  drawCastle(ctx, 40, '#d5dbdb', '#3498db'); // 自城
+  drawCastle(ctx, CANVAS_WIDTH - 120, '#566573', '#e74c3c'); // 敵城
   drawHpBars(ctx, s.baseHp, s.enemyBaseHp, stage);
 
   s.units.forEach((u: Unit) => {
     const bob = Math.sin(timestamp / 50) * 5;
     const curY = u.y + bob;
-    ctx.save();
-    ctx.translate(u.x, curY);
+    ctx.save(); ctx.translate(u.x, curY);
     if (u.type === 'enemy') ctx.scale(-1, 1);
     ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
 
@@ -35,11 +42,11 @@ export const drawGame = (ctx: CanvasRenderingContext2D, s: any, stage: StageConf
       case 'BASIC': drawCatBasic(ctx, u.stats); break;
       case 'TANK':  drawCatTank(ctx, u.stats); break;
       case 'BATTLE': drawCatBattle(ctx, u.stats, timestamp); break;
-      case 'LEGS':  drawCatLegs(ctx, u.stats); break;
+      case 'LEGS':  drawCatLegs(ctx, u.stats, timestamp); break;
       case 'COW':   drawCatCow(ctx, u.stats); break;
       case 'BIRD':  drawCatBird(ctx, u.stats, timestamp); break;
       case 'FISH':  drawCatFish(ctx, u.stats); break;
-      case 'LIZARD': drawCatLizard(ctx, u.stats); break;
+      case 'LIZARD': drawCatLizard(ctx, u.stats, timestamp); break;
       case 'ENEMY': drawDogEnemy(ctx, u.stats); break;
     }
     ctx.restore();
@@ -54,10 +61,40 @@ export const drawGame = (ctx: CanvasRenderingContext2D, s: any, stage: StageConf
   if (s.isCannonFiring) drawCannonEffect(ctx);
 };
 
+/**
+ * タイトル画面の背景とキャラクターを描画
+ */
+const drawTitleBackground = (ctx: CanvasRenderingContext2D, timestamp: number) => {
+  // 背景は草原ステージ(Stage 1)をベースにする
+  const sky = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  sky.addColorStop(0, '#85c1e9'); sky.addColorStop(1, '#d6eaf8');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  ctx.fillStyle = '#229954'; ctx.fillRect(0, CANVAS_HEIGHT - 55, CANVAS_WIDTH, 10);
+  ctx.fillStyle = '#7d6608'; ctx.fillRect(0, CANVAS_HEIGHT - 45, CANVAS_WIDTH, 45);
+
+  // キャラクターを行進させる (にゃんこ、タンク、バトル)
+  const drawTitleCat = (x: number, y: number, unitType: string, stats: any) => {
+    const bob = Math.sin((timestamp + x * 10) / 50) * 8;
+    ctx.save(); ctx.translate(x, y + bob); ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+    if (unitType === 'BASIC') drawCatBasic(ctx, stats);
+    if (unitType === 'TANK') drawCatTank(ctx, stats);
+    if (unitType === 'BATTLE') drawCatBattle(ctx, stats, timestamp);
+    ctx.restore();
+  };
+
+  const basicStats = { radius: 18, color: '#ffffff' };
+  const tankStats = { radius: 25, color: '#f0f0f0' };
+  const battleStats = { radius: 18, color: '#ffcccc' };
+
+  drawTitleCat(CANVAS_WIDTH * 0.3, CANVAS_HEIGHT - 70, 'BASIC', basicStats);
+  drawTitleCat(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT - 70, 'TANK', tankStats);
+  drawTitleCat(CANVAS_WIDTH * 0.7, CANVAS_HEIGHT - 70, 'BATTLE', battleStats);
+};
+
 const drawHpBars = (ctx: CanvasRenderingContext2D, baseHp: number, enemyBaseHp: number, stage: StageConfig) => {
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
   ctx.fillRect(30, CANVAS_HEIGHT - 175, 100, 8); ctx.strokeRect(30, CANVAS_HEIGHT - 175, 100, 8);
-  ctx.fillStyle = '#3498db'; ctx.fillRect(30, CANVAS_HEIGHT - 175, Math.max(0, (baseHp / stage.baseHp) * 100), 8);
+  ctx.fillStyle = '#3498db'; ctx.fillRect(30, CANVAS_HEIGHT - 175, (baseHp / stage.baseHp) * 100, 8);
   ctx.fillStyle = '#fff';
   ctx.fillRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, 100, 8); ctx.strokeRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, 100, 8);
   ctx.fillStyle = '#e74c3c'; ctx.fillRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, (enemyBaseHp / stage.enemyBaseHp) * 100, 8);
