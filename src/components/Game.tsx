@@ -6,6 +6,9 @@ import { useGameAudio } from '../hooks/useGameAudio';
 import { drawGame } from './Canvas/renderer';
 import { GaugeButton } from './UI/GaugeButton';
 
+/**
+ * ゲームのメインコンポーネント
+ */
 const Game: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audio = useGameAudio();
@@ -15,7 +18,7 @@ const Game: React.FC = () => {
   useEffect(() => { audioRef.current = audio; }, [audio]);
   
   const [currentStage, setCurrentStage] = useState<StageConfig>(STAGES[1]);
-  const currentStageRef = useRef(STAGES[1]); // ループ内参照用
+  const currentStageRef = useRef(STAGES[1]);
 
   const stateRef = useRef({
     money: 0, walletLevel: 1, baseHp: 1000, enemyBaseHp: 1000,
@@ -35,16 +38,12 @@ const Game: React.FC = () => {
   const startGame = (stage: StageConfig) => {
     setCurrentStage(stage);
     currentStageRef.current = stage;
-    
-    // 音声エンジンを活性化し、BGMを開始
     audio.initAudio();
     audio.startBGM();
-    
     const s = stateRef.current;
     s.baseHp = stage.baseHp; s.enemyBaseHp = stage.enemyBaseHp;
     s.money = 0; s.walletLevel = 1; s.units = []; s.cannonCharge = 0;
     s.gameState = 'playing'; s.lastTime = 0;
-    
     audio.playSystemSE(440);
   };
 
@@ -58,10 +57,8 @@ const Game: React.FC = () => {
       if (!s.lastTime) s.lastTime = timestamp;
       let dt = (timestamp - s.lastTime); if (dt > 100) dt = 100;
       s.lastTime = timestamp;
-
       if (s.gameState === 'playing') update(dt / 1000, timestamp);
       drawGame(ctx, s, currentStageRef.current, timestamp);
-
       setUi({
         money: Math.floor(s.money), walletLevel: s.walletLevel,
         baseHp: s.baseHp, enemyBaseHp: s.enemyBaseHp, cannonCharge: Math.floor(s.cannonCharge),
@@ -79,16 +76,13 @@ const Game: React.FC = () => {
       const s = stateRef.current;
       const a = audioRef.current;
       const stage = currentStageRef.current;
-      
       s.money += (30 + s.walletLevel * 20) * dt;
       if (s.cannonCharge < 100) s.cannonCharge = Math.min(100, s.cannonCharge + dt * 3.3);
-      
       Object.keys(s.cooldowns).forEach(k => {
         const wasReady = s.cooldowns[k] <= 0;
         s.cooldowns[k] = Math.max(0, s.cooldowns[k] - dt * 1000);
         if (!wasReady && s.cooldowns[k] <= 0) a.playCharinSound();
       });
-
       s.enemySpawnTimer += dt * 1000;
       if (s.enemySpawnTimer > stage.enemySpawnRate) { 
         const stats = { ...UNIT_TYPES['ENEMY'] };
@@ -99,7 +93,6 @@ const Game: React.FC = () => {
         });
         s.enemySpawnTimer = 0; 
       }
-
       let someoneIsAttacking = false;
       const curUnits = [...s.units];
       s.units = curUnits.map(u => {
@@ -111,22 +104,17 @@ const Game: React.FC = () => {
         });
         if (u.type === 'ally' && u.x > CANVAS_WIDTH - 150) {
           s.enemyBaseHp = Math.max(0, s.enemyBaseHp - u.stats.damage * dt);
-          if (s.enemyBaseHp <= 0 && s.gameState === 'playing') {
-            s.gameState = 'victory'; a.stopBGM(); a.playVictoryFanfare();
-          }
+          if (s.enemyBaseHp <= 0 && s.gameState === 'playing') { s.gameState = 'victory'; a.stopBGM(); a.playVictoryFanfare(); }
           isAtk = true;
         } else if (u.type === 'enemy' && u.x < 150) {
           s.baseHp = Math.max(0, s.baseHp - u.stats.damage * dt);
-          if (s.baseHp <= 0 && s.gameState === 'playing') {
-            s.gameState = 'defeat'; a.stopBGM(); a.playDefeatJingle();
-          }
+          if (s.baseHp <= 0 && s.gameState === 'playing') { s.gameState = 'defeat'; a.stopBGM(); a.playDefeatJingle(); }
           isAtk = true;
         }
         if (isAtk) someoneIsAttacking = true;
         let nx = u.x; if (!isAtk) nx += u.stats.speed * (dt * 60) * (u.type === 'ally' ? 1 : -1);
         return { ...u, x: nx, currentHp: u.currentHp - dmgTaken };
       }).filter(u => u.currentHp > 0);
-
       if (someoneIsAttacking && timestamp - s.lastAttackSoundTime > 300) {
         a.playGashiSound(); s.lastAttackSoundTime = timestamp;
       }
@@ -134,7 +122,9 @@ const Game: React.FC = () => {
 
     requestID = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(requestID); };
-  }, []); // 依存配列を空にしてループを不変にする
+  }, []);
+
+  // --- 操作パネル用関数 ---
 
   const handleSpawn = (type: keyof typeof UNIT_TYPES) => {
     const s = stateRef.current;
@@ -149,6 +139,25 @@ const Game: React.FC = () => {
     }
   };
 
+  const handleUpgrade = () => {
+    const s = stateRef.current;
+    const cost = s.walletLevel * 200;
+    if (s.money >= cost && s.walletLevel < 8) {
+      s.money -= cost; s.walletLevel++; audio.playSystemSE(330);
+    }
+  };
+
+  const handleCannon = () => {
+    const s = stateRef.current;
+    if (s.cannonCharge < 100 || s.isCannonFiring) return;
+    s.isCannonFiring = true; s.cannonCharge = 0;
+    audio.playCannonSound();
+    setTimeout(() => {
+      s.units = s.units.map(u => u.type === 'enemy' ? { ...u, currentHp: u.currentHp - 100, x: u.x + 100 } : u).filter(u => u.currentHp > 0);
+      setTimeout(() => s.isCannonFiring = false, 500);
+    }, 500);
+  };
+
   return (
     <div style={{ textAlign: 'center', backgroundColor: '#ecf0f1', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '10px' }}>
@@ -157,7 +166,6 @@ const Game: React.FC = () => {
           SOUND: {audio.isAudioEnabled ? 'OFF' : 'ON'}
         </button>
       </div>
-      
       <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}>
         <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ border: '4px solid #34495e', borderRadius: '15px', backgroundColor: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }} />
         {ui.gameState === 'start' && (
@@ -179,13 +187,16 @@ const Game: React.FC = () => {
           </div>
         )}
       </div>
-
       <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
         <GaugeButton label={<>にゃんこ砲<br/>({ui.cannonCharge}%)</>} percent={ui.cannonCharge} onClick={handleCannon} disabled={ui.cannonCharge < 100 || ui.gameState !== 'playing'} readyColor="#e74c3c" gaugeColor="#f39c12" />
-        <GaugeButton label={<>働きネコ Lv.{ui.walletLevel}<br/>(${ui.walletLevel * 200})</>} percent={100} onClick={() => { if (stateRef.current.money >= ui.walletLevel * 200 && ui.walletLevel < 8) { stateRef.current.money -= ui.walletLevel * 200; stateRef.current.walletLevel++; audio.playSystemSE(330); } }} disabled={ui.money < ui.walletLevel * 200 || ui.walletLevel >= 8 || ui.gameState !== 'playing'} readyColor="#e67e22" gaugeColor="#e67e22" width="150px" />
-        {(['BASIC', 'TANK', 'BATTLE'] as const).map(t => (
-          <GaugeButton key={t} label={<>{UNIT_TYPES[t].name}<br/>(${UNIT_TYPES[t].cost})</>} percent={ui.cooldownPercents[t]} onClick={() => handleSpawn(t)} disabled={ui.cooldownPercents[t] < 100 || ui.money < UNIT_TYPES[t].cost || ui.gameState !== 'playing'} readyColor="#2ecc71" gaugeColor="#3498db" />
-        ))}
+        <GaugeButton label={<>働きネコ Lv.{ui.walletLevel}<br/>(${ui.walletLevel * 200})</>} percent={100} onClick={handleUpgrade} disabled={ui.money < ui.walletLevel * 200 || ui.walletLevel >= 8 || ui.gameState !== 'playing'} readyColor="#e67e22" gaugeColor="#e67e22" width="150px" />
+        {(['BASIC', 'TANK', 'BATTLE'] as const).map(t => {
+          const percent = ui.cooldownPercents[t];
+          const isReady = percent >= 100 && ui.money >= UNIT_TYPES[t].cost;
+          return (
+            <GaugeButton key={t} label={<>{UNIT_TYPES[t].name}<br/>(${UNIT_TYPES[t].cost})</>} percent={percent} onClick={() => handleSpawn(t)} disabled={!isReady || ui.gameState !== 'playing'} readyColor="#2ecc71" gaugeColor="#3498db" />
+          );
+        })}
       </div>
     </div>
   );
