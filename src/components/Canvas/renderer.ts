@@ -1,66 +1,99 @@
 import { type UnitStats, CANVAS_WIDTH, CANVAS_HEIGHT } from '../../constants/gameStats';
 
+/**
+ * ユニットインスタンスの定義
+ */
 interface Unit {
   id: number; x: number; y: number; type: 'ally' | 'enemy';
   unitType: string; stats: UnitStats; currentHp: number;
 }
 
-// ユニット描画の内部関数
+/**
+ * 個別のユニットを描画する内部関数
+ * 
+ * @param ctx Canvasコンテキスト
+ * @param unit 描画対象のユニット
+ * @param timestamp アニメーション用の現在時刻
+ */
 const drawUnit = (ctx: CanvasRenderingContext2D, unit: Unit, timestamp: number) => {
   const { x, y, stats, type, unitType } = unit;
-  const bob = Math.sin(timestamp / 50) * 5;
+  const bob = Math.sin(timestamp / 50) * 5; // 上下に揺れる歩行アニメーション
   const curY = y + bob;
 
   ctx.save();
   ctx.translate(x, curY);
-  if (type === 'enemy') ctx.scale(-1, 1);
+  if (type === 'enemy') ctx.scale(-1, 1); // 敵軍は左向きに反転
   ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
 
   if (type === 'ally') {
+    // --- ネコ陣営の描画 ---
     ctx.fillStyle = stats.color;
     if (unitType === 'TANK') {
+      // タンクねこ: 特徴的な縦長シルエット
       ctx.beginPath(); ctx.roundRect(-stats.radius * 0.8, -stats.radius * 2.5, stats.radius * 1.6, stats.radius * 2.8, 10); ctx.fill(); ctx.stroke();
     } else {
+      // 通常ねこ / バトルねこ: 円形
       ctx.beginPath(); ctx.arc(0, 0, stats.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke();
     }
+    // 耳
     ctx.fillStyle = (unitType === 'BATTLE') ? '#c0392b' : stats.color;
     const earY = unitType === 'TANK' ? -stats.radius * 2.5 : -stats.radius * 0.5;
     ctx.beginPath(); ctx.moveTo(-stats.radius * 0.6, earY); ctx.lineTo(-stats.radius * 1.0, earY - 15); ctx.lineTo(-stats.radius * 0.2, earY - 10); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(stats.radius * 0.6, earY); ctx.lineTo(stats.radius * 1.0, earY - 15); ctx.lineTo(stats.radius * 0.2, earY - 10); ctx.fill(); ctx.stroke();
+    // 目
     ctx.fillStyle = '#333'; const eyeY = unitType === 'TANK' ? -stats.radius * 1.8 : -2;
     ctx.fillRect(-stats.radius*0.4, eyeY, 3, 6); ctx.fillRect(stats.radius*0.2, eyeY, 3, 6);
-    ctx.lineWidth = 1;
-    const whiskerY = unitType === 'TANK' ? -stats.radius * 1.5 : 5;
+    // ひげ
+    ctx.lineWidth = 1; const whiskerY = unitType === 'TANK' ? -stats.radius * 1.5 : 5;
     ctx.beginPath(); ctx.moveTo(-stats.radius*0.5, whiskerY); ctx.lineTo(-stats.radius*1.2, whiskerY-2); ctx.stroke();
+    // 武器 (バトルねこの斧)
     if (unitType === 'BATTLE') {
       ctx.save(); ctx.translate(stats.radius * 0.8, 0); ctx.rotate(Math.sin(timestamp / 100) * 0.5);
       ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(0, -30); ctx.stroke();
       ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.moveTo(0, -30); ctx.quadraticCurveTo(25, -35, 20, -10); ctx.lineTo(0, -15); ctx.fill(); ctx.stroke(); ctx.restore();
     }
   } else {
-    ctx.fillStyle = stats.color; ctx.beginPath(); ctx.ellipse(0, 0, stats.radius * 1.2, stats.radius, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.arc(-stats.radius * 0.8, -stats.radius * 0.5, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // --- わんこ陣営の描画 ---
+    ctx.fillStyle = stats.color;
+    ctx.beginPath(); ctx.ellipse(0, 0, stats.radius * 1.2, stats.radius, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 耳 (丸い垂れ耳)
+    ctx.fillStyle = '#2c3e50';
+    ctx.beginPath(); ctx.arc(-stats.radius * 0.8, -stats.radius * 0.5, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.arc(stats.radius * 0.8, -stats.radius * 0.5, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#ff0000'; ctx.beginPath(); ctx.arc(stats.radius * 0.3, -5, 4, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(-stats.radius * 0.1, -5, 4, 0, Math.PI * 2); ctx.fill();
+    // 赤く光る目
+    ctx.fillStyle = '#ff0000';
+    ctx.beginPath(); ctx.arc(stats.radius * 0.3, -5, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-stats.radius * 0.1, -5, 4, 0, Math.PI * 2); ctx.fill();
   }
   ctx.restore();
+
+  // ユニットHPバーの描画
   const hpBarY = (unitType === 'TANK') ? curY - stats.radius * 2.8 : curY - stats.radius - 20;
   ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x - 20, hpBarY, 40, 4);
   ctx.fillStyle = type === 'ally' ? '#2ecc71' : '#e74c3c';
   ctx.fillRect(x - 20, hpBarY, (unit.currentHp / stats.hp) * 40, 4);
 };
 
-// メイン描画関数
+/**
+ * ゲーム全体のメイン描画関数
+ * 
+ * @param ctx Canvasコンテキスト
+ * @param s ゲーム状態の参照 (stateRef.current)
+ * @param timestamp アニメーション用の現在時刻
+ */
 export const drawGame = (ctx: CanvasRenderingContext2D, s: any, timestamp: number) => {
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   
+  // 1. 背景 (空・グラデーション)
   const sky = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   sky.addColorStop(0, '#85c1e9'); sky.addColorStop(1, '#d6eaf8');
   ctx.fillStyle = sky; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+  // 2. 遠景 (山)
   ctx.fillStyle = '#5dade2'; ctx.beginPath(); ctx.moveTo(-50, CANVAS_HEIGHT-50); ctx.lineTo(150, 100); ctx.lineTo(350, CANVAS_HEIGHT-50); ctx.fill();
   ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.moveTo(200, CANVAS_HEIGHT-50); ctx.lineTo(450, 150); ctx.lineTo(700, CANVAS_HEIGHT-50); ctx.fill();
 
+  // 3. 雲 (ゆっくり流れるアニメーション)
   const cloudX = (timestamp / 100) % (CANVAS_WIDTH + 200) - 100;
   ctx.fillStyle = 'rgba(255,255,255,0.8)';
   const drawCloud = (cx: number, cy: number) => {
@@ -68,9 +101,11 @@ export const drawGame = (ctx: CanvasRenderingContext2D, s: any, timestamp: numbe
   };
   drawCloud(cloudX, 50); drawCloud(cloudX - 400, 80);
 
+  // 4. 地面 (芝生と土)
   ctx.fillStyle = '#229954'; ctx.fillRect(0, CANVAS_HEIGHT - 55, CANVAS_WIDTH, 10);
   ctx.fillStyle = '#7d6608'; ctx.fillRect(0, CANVAS_HEIGHT - 45, CANVAS_WIDTH, 45);
 
+  // 5. 城 (拠点) の描画
   const drawCastle = (x: number, color: string, isAlly: boolean) => {
     ctx.fillStyle = color; ctx.fillRect(x, CANVAS_HEIGHT - 150, 80, 100);
     ctx.fillStyle = '#333'; ctx.fillRect(x + 25, CANVAS_HEIGHT - 90, 30, 40);
@@ -80,19 +115,23 @@ export const drawGame = (ctx: CanvasRenderingContext2D, s: any, timestamp: numbe
   };
   drawCastle(40, '#d5dbdb', true); drawCastle(CANVAS_WIDTH - 120, '#566573', false);
 
+  // 6. 城のHPゲージ
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
   ctx.fillRect(30, CANVAS_HEIGHT - 175, 100, 8); ctx.strokeRect(30, CANVAS_HEIGHT - 175, 100, 8);
   ctx.fillStyle = '#3498db'; ctx.fillRect(30, CANVAS_HEIGHT - 175, (s.baseHp / 1000) * 100, 8);
   ctx.fillStyle = '#fff'; ctx.fillRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, 100, 8); ctx.strokeRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, 100, 8);
   ctx.fillStyle = '#e74c3c'; ctx.fillRect(CANVAS_WIDTH - 130, CANVAS_HEIGHT - 175, (s.enemyBaseHp / 1000) * 100, 8);
 
+  // 7. 全ユニットの描画
   s.units.forEach((u: Unit) => drawUnit(ctx, u, timestamp));
 
+  // 8. お金・レベル表示ボックス (Canvasオーバーレイ)
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   ctx.beginPath(); ctx.roundRect(10, 10, 180, 70, 10); ctx.fill();
   ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 22px Arial'; ctx.fillText(`$ ${Math.floor(s.money)}`, 25, 40);
   ctx.fillStyle = '#fff'; ctx.font = '14px Arial'; ctx.fillText(`Lv.${s.walletLevel} 働きネコ`, 25, 65);
 
+  // 9. にゃんこ砲発射演出 (レーザー)
   if (s.isCannonFiring) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.fillRect(100, CANVAS_HEIGHT - 100, CANVAS_WIDTH, 40);
     ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 4; ctx.strokeRect(100, CANVAS_HEIGHT - 100, CANVAS_WIDTH, 40);
